@@ -1,0 +1,171 @@
+#!/usr/bin/python
+
+import os, subprocess, sys, re
+
+# When programs want to know shell version(ex. neofetch), they get hung up without this
+if "--version" in sys.argv:
+    print("0.1.0")
+    exit()
+
+
+# Template function:
+# def my_function(argument_list):
+#     try:
+#        source = argument_list[0]
+#        destination = argument_list[1]
+#        print(f"Changed {source} to {destination}")
+#     except IndexError:
+#        print("Missing arguments")
+
+
+# Built in functions here
+
+
+def pwd():
+    print(os.getcwd())
+
+
+def signal(args):
+    try:
+        pid, signal = args[0], args[1]
+        os.kill(int(pid), int(signal))
+    except (ProcessLookupError, OSError):
+        print("No such pid")
+    except (ValueError, IndexError):
+        print("Invalid arguments")
+    except PermissionError:
+        print("Permission denied")
+    except OSError:
+        print("No such signal")
+
+
+def mode(file):
+    try:
+        stat = os.stat(file[0])
+        print(oct(stat.st_mode)[-3:])
+    except IndexError:
+        print("Missing arguments")
+    except FileNotFoundError:
+        print("No such file")
+
+
+def ls():
+    try:
+        dirlist = [d for d in os.listdir() if os.path.isdir(d)]
+        filelist = [f for f in os.listdir() if not os.path.isdir(f)]
+        # List files first, then directories
+        for f in filelist:
+            print(f)
+        for d in dirlist:
+            print(f"{d}/")
+    except PermissionError:
+        print("Permission denied")
+    except (FileNotFoundError, NotADirectoryError):
+        print("No such directory")
+
+
+def cd(target):
+    try:
+        os.chdir(target[0])
+    except FileNotFoundError:
+        print("No such directory")
+    except PermissionError:
+        print("Permission denied")
+    except IndexError:
+        os.chdir(os.environ["HOME"])
+
+
+def get_env(var_name):
+    try:
+        print(os.environ[str(var_name[0])])
+    except KeyError:
+        print()
+    except IndexError:
+        print("Missing arguments")
+
+
+def set_env(name):
+    try:
+        os.environ[name[0]] = name[1]
+    except IndexError:
+        print("Missing arguments")
+
+
+def mkdir(names):
+    for d in names:
+        try:
+            os.mkdir(d)
+        except FileExistsError:
+            print(f"Directory '{d}' exists")
+        except FileNotFoundError:
+            print("No such directory")
+        except PermissionError:
+            print("Permission denied")
+
+
+def sh_help(command):
+    for i in BUILTINS:
+        print(i)
+
+
+# Built in function mapping here
+BUILTINS = {
+    "cd": cd,
+    "ls": ls,
+    "pwd": pwd,
+    "mkdir": mkdir,
+    "mode": mode,
+    "sig": signal,
+    "help": sh_help,
+    "setenv": set_env,
+    "getenv": get_env,
+}
+
+
+# Return the prompt
+def get_prompt():
+    return os.getcwd() + " $ "
+
+
+# Read the user input
+def readline(PS1):
+    cmd = input(PS1).split(" ")
+    ncmd = []
+    for i in range(0, len(cmd)):
+        ncmd.append(re.sub(r"\\", " ", cmd[i]))
+
+    return ncmd
+
+
+# The main function definition
+def main():
+    try:
+        while True:
+            PS1 = get_prompt()
+            # Replace /home/USER with ~
+            PS1 = re.sub(os.environ["HOME"], "~", PS1)
+
+            command = readline(PS1)
+            if command[0] in BUILTINS:
+                try:
+                    BUILTINS[command[0]](command[1:])
+                except TypeError:
+                    BUILTINS[command[0]]()
+            else:
+                try:
+                    subprocess.run(command)
+                except FileNotFoundError:
+                    print("Unknown command")
+                except PermissionError:
+                    pass
+    except KeyboardInterrupt:
+        print()
+        # Ignore Interrupt
+        main()
+    except EOFError:
+        print()
+        exit()
+
+
+# Call the main function
+main()
